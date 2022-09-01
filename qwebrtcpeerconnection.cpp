@@ -2,6 +2,7 @@
 #include "qwebrtcpeerconnection.hpp"
 #include "qwebrtcpeerconnection_p.hpp"
 #include "qwebrtcmediastream_p.hpp"
+#include "qwebrtcmediatrack_p.hpp"
 #include "qwebrtcdatachannel_p.hpp"
 #include "qwebrtctypes_p.hpp"
 #include "qwebrtcicecandidate.hpp"
@@ -277,6 +278,7 @@ QWebRTCPeerConnection::IceGatheringState QWebRTCPeerConnection::iceGatheringStat
 QWebRTCPeerConnection::QWebRTCPeerConnection()
     : m_impl(new QWebRTCPeerConnection_impl(this))
 {
+    qRegisterMetaType<QWebRTCMediaTrackPtr>("QWebRTCMediaTrackPtr");
 }
 
 QWebRTCPeerConnection::~QWebRTCPeerConnection()
@@ -358,4 +360,10 @@ void QWebRTCPeerConnection_impl::OnIceConnectionReceivingChange(bool receiving)
 void QWebRTCPeerConnection_impl::OnAddTrack(rtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver,
     const std::vector<rtc::scoped_refptr<webrtc::MediaStreamInterface>>& streams) {
     qDebug() << "video track added";
+    for (const auto stream : streams) {
+        for (auto videoTrack : stream->GetVideoTracks()) {
+            QWebRTCMediaTrackPtr videoStream(new QWebRTCMediaTrack_impl(videoTrack, nullptr));
+            Q_EMIT q_ptr->videoTrackAdded(videoStream);
+        }
+    }
 }

@@ -14,6 +14,9 @@
 #include "webrtc/modules/video_capture/video_capture_factory.h"
 #include <QThread>
 #include <QCoreApplication>
+#include <QDebug>
+
+#include <libyuv/convert.h>
 
 class QWebRTCPeerConnectionFactory_impl {
 public:
@@ -38,11 +41,97 @@ Q_DECLARE_METATYPE(QSharedPointer<QWebRTCIceCandidate>)
 Q_DECLARE_METATYPE(QSharedPointer<QWebRTCMediaStream>)
 Q_DECLARE_METATYPE(QSharedPointer<QWebRTCDataChannel>)
 
+
+WebRTCFrameFetcher::WebRTCFrameFetcher() :
+    QAbstractVideoFilter(),
+    rtc::AdaptedVideoTrackSource()
+{
+}
+
+QVideoFilterRunnable* WebRTCFrameFetcher::createFilterRunnable()
+{
+    return new FrameFetchRunnable(this);
+}
+
+void WebRTCFrameFetcher::OnFrameCaptured(const rtc::scoped_refptr<webrtc::I420Buffer>& buffer)
+{
+    if (!m_timestamper.isValid())
+        m_timestamper.start();
+    webrtc::VideoFrame frame(buffer, webrtc::VideoRotation::kVideoRotation_0, m_timestamper.nsecsElapsed() / 1000);
+    OnFrame(frame);
+}
+
+int WebRTCFrameFetcher::AddRef() const {
+    return rtc::AtomicOps::Increment(&ref_count_);
+}
+
+int WebRTCFrameFetcher::Release() const {
+    const int count = rtc::AtomicOps::Decrement(&ref_count_);
+    return count;
+}
+
+webrtc::MediaSourceInterface::SourceState WebRTCFrameFetcher::state() const {
+    return webrtc::MediaSourceInterface::SourceState::kLive;
+}
+
+bool WebRTCFrameFetcher::remote() const {
+    return false;
+}
+
+bool WebRTCFrameFetcher::is_screencast() const {
+    return false;
+}
+
+rtc::Optional<bool> WebRTCFrameFetcher::needs_denoising() const {
+    return rtc::Optional<bool>(false);
+}
+
+FrameFetchRunnable::FrameFetchRunnable(WebRTCFrameFetcher* filter) :
+    QVideoFilterRunnable(),
+    m_filter(filter)
+{
+}
+
+QVideoFrame FrameFetchRunnable::run(QVideoFrame *input, const QVideoSurfaceFormat &surfaceFormat, RunFlags flags)
+{
+    Q_UNUSED(surfaceFormat)
+    Q_UNUSED(flags)
+
+    if (!input)
+    {
+        return QVideoFrame();
+    }
+
+    if (!m_filter)
+    {
+        return *input;
+    }
+
+    input->map(QAbstractVideoBuffer::ReadOnly);
+    if (input->mappedBytes() <= 0) {
+        input->unmap();
+        return *input;
+    }
+
+    rtc::scoped_refptr<webrtc::I420Buffer> buffer = webrtc::I420Buffer::Create(input->width(), input->height());
+    libyuv::ABGRToI420(input->bits(), input->bytesPerLine(),
+                       buffer->MutableDataY(), buffer->StrideY(),
+                       buffer->MutableDataU(), buffer->StrideU(),
+                       buffer->MutableDataV(), buffer->StrideV(),
+                       buffer->width(), buffer->height());
+    input->unmap();
+
+    m_filter->OnFrameCaptured(buffer);
+
+    return *input;
+}
+
 QWebRTCPeerConnectionFactory::QWebRTCPeerConnectionFactory()
 {
     qRegisterMetaType<QSharedPointer<QWebRTCIceCandidate> >();
     qRegisterMetaType<QSharedPointer<QWebRTCMediaStream> >();
     qRegisterMetaType<QSharedPointer<QWebRTCDataChannel> >();
+
     m_impl = QSharedPointer<QWebRTCPeerConnectionFactory_impl>(new QWebRTCPeerConnectionFactory_impl());
     m_impl->m_networkingThread = rtc::Thread::CreateWithSocketServer();
     if (!m_impl->m_networkingThread->Start()) {
@@ -75,41 +164,9 @@ QSharedPointer<QWebRTCMediaTrack> QWebRTCPeerConnectionFactory::createAudioTrack
     return QSharedPointer<QWebRTCMediaTrack>(new QWebRTCMediaTrack_impl(audioTrack));
 }
 
-QSharedPointer<QWebRTCMediaTrack> QWebRTCPeerConnectionFactory::createVideoTrack(const QVariantMap& constraints, const QString& label)
+QSharedPointer<QWebRTCMediaTrack> QWebRTCPeerConnectionFactory::createVideoTrack(webrtc::VideoTrackSourceInterface* videoSource,
+                                                                                 const QString& label)
 {
-    std::vector<std::string> device_names;
-    {
-        std::unique_ptr<webrtc::VideoCaptureModule::DeviceInfo> info(
-                    webrtc::VideoCaptureFactory::CreateDeviceInfo());
-        if (!info) {
-            return QSharedPointer<QWebRTCMediaTrack>();
-        }
-        int num_devices = info->NumberOfDevices();
-        for (int i = 0; i < num_devices; ++i) {
-            const uint32_t kSize = 256;
-            char name[kSize] = {0};
-            char id[kSize] = {0};
-            if (info->GetDeviceName(i, name, kSize, id, kSize) != -1) {
-                device_names.push_back(name);
-                qDebug() << "Video device " << i << " " << QString::fromStdString(name);
-            }
-        }
-    }
-
-    cricket::WebRtcVideoDeviceCapturerFactory factory;
-    std::unique_ptr<cricket::VideoCapturer> capturer;
-    for (const auto& name : device_names) {
-        capturer = factory.Create(cricket::Device(name, 0));
-        if (capturer) {
-            break;
-        }
-    }
-    if (!capturer) {
-        qWarning() << "Could not find a camera device";
-        return QSharedPointer<QWebRTCMediaTrack>();
-    }
-
-    auto videoSource = m_impl->native_interface->CreateVideoSource(std::move(capturer));
     auto videoTrack = m_impl->native_interface->CreateVideoTrack(label.toStdString(), videoSource);
     return QSharedPointer<QWebRTCMediaTrack>(new QWebRTCMediaTrack_impl(videoTrack, videoSource));
 }

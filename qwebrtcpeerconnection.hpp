@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QSharedPointer>
 #include "qwebrtcsessiondescription.hpp"
+#include "qwebrtcmediatrack.hpp"
 
 class QWebRTCPeerConnection_impl;
 
@@ -10,8 +11,8 @@ class QWebRTCDataChannel;
 struct QWebRTCDataChannelConfig;
 class QWebRTCIceCandidate;
 class QWebRTCSessionDescription;
-
 class QWebRTCMediaStream;
+class QWebRTCMediaTrack;
 
 class QWebRTCPeerConnection : public QObject {
     Q_OBJECT
@@ -84,6 +85,7 @@ Q_SIGNALS:
     void iceCandidateRemoved(QSharedPointer<QWebRTCIceCandidate>);
     void renegotiationNeeded();
     void dataChannelReceived(const QSharedPointer<QWebRTCDataChannel>&);
+    void videoTrackAdded(const QWebRTCMediaTrackPtr&);
 
 private:
     QWebRTCPeerConnection();

@@ -15,7 +15,7 @@ option(ENABLE_ASAN "ASAN build" OFF)
 option(ENABLE_TSAN "TSAN build" OFF)
 option(ENABLE_UBSAN "UBSAN build" OFF)
 
-set(CMAKE_CXX_FLAGS "-Wall -Werror -Wno-deprecated-declarations -Wno-error=unused-variable ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "-Wall -Werror -Wno-deprecated-declarations -Wno-error=unused-variable -fno-rtti ${CMAKE_CXX_FLAGS}")
 if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang" AND "${CMAKE_GENERATOR}" STREQUAL "Ninja")
     set(CMAKE_CXX_FLAGS "-fcolor-diagnostics ${CMAKE_CXX_FLAGS}")
     set(START_GROUP )
@@ -58,11 +58,11 @@ include_directories(
 )
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-find_path(WebRTCOutDir webrtc
-    HINTS "${CMAKE_CURRENT_BINARY_DIR}/webrtc/src/out/Default/obj"
-    PATH_SUFFIXES webrtc)
+#find_path(WebRTCOutDir webrtc
+#    HINTS "${CMAKE_CURRENT_BINARY_DIR}/webrtc/src/out/Default/obj"
+#    PATH_SUFFIXES webrtc)
 
-find_package(Qt5 COMPONENTS Core Widgets Quick)
+find_package(Qt5 COMPONENTS Core Widgets Quick Multimedia)
 
 set(INSTALL_DISABLED TRUE)
 
@@ -114,62 +114,10 @@ add_library(${PROJECT_NAME} SHARED
 )
 
 target_link_libraries(${PROJECT_NAME}
-    ${START_GROUP}
-    "${WebRTCOutDir}/libwebrtc.a"
-    "${WebRTCOutDir}/libwebrtc_common.a"
-    "${WebRTCOutDir}/pc/librtc_pc.a"
-    "${WebRTCOutDir}/call/libcall.a"
-    "${WebRTCOutDir}/audio/libaudio.a"
-    "${WebRTCOutDir}/common_audio/libcommon_audio.a"
-    "${WebRTCOutDir}/common_audio/libcommon_audio_sse2.a"
-    "${WebRTCOutDir}/base/librtc_base_approved.a"
-    "${WebRTCOutDir}/base/librtc_base.a"
-    "${WebRTCOutDir}/video/libvideo.a"
-    "${WebRTCOutDir}/common_video/libcommon_video.a"
-    "${WebRTCOutDir}/base/librtc_numerics.a"
-    "${WebRTCOutDir}/base/librtc_task_queue.a"
-    "${WebRTCOutDir}/media/librtc_media.a"
-    "${WebRTCOutDir}/media/librtc_media_base.a"
-    "${WebRTCOutDir}/api/libjingle_peerconnection_api.a"
-    "${WebRTCOutDir}/../third_party/usrsctp/libusrsctp.a"
-    "${WebRTCOutDir}/../third_party/libsrtp/libsrtp.a"
-    "${WebRTCOutDir}/../third_party/libyuv/libyuv_internal.a"
-    "${WebRTCOutDir}/../third_party/opus/libopus.a"
-    "${WebRTCOutDir}/../third_party/protobuf/libprotobuf_full.a"
-    "${WebRTCOutDir}/../third_party/ffmpeg/libffmpeg_yasm.a"
-    "${WebRTCOutDir}/p2p/librtc_p2p.a"
-    "${WebRTCOutDir}/modules/rtp_rtcp/librtp_rtcp.a"
-    "${WebRTCOutDir}/modules/audio_processing/libaudio_processing.a"
-    "${WebRTCOutDir}/modules/audio_processing/libaudio_processing_sse2.a"
-    "${WebRTCOutDir}/modules/audio_processing/libaudioproc_debug_proto.a"
-    "${WebRTCOutDir}/modules/video_coding/libwebrtc_i420.a"
-    "${WebRTCOutDir}/modules/video_coding/libwebrtc_vp8.a"
-    "${WebRTCOutDir}/modules/video_coding/libwebrtc_vp9.a"
-    "${WebRTCOutDir}/modules/video_coding/libvideo_coding.a"
-    "${WebRTCOutDir}/modules/video_coding/libwebrtc_h264.a"
-    "${WebRTCOutDir}/modules/video_coding/libvideo_coding_utility.a"
-    "${WebRTCOutDir}/modules/pacing/libpacing.a"
-    "${WebRTCOutDir}/modules/utility/libutility.a"
-    "${WebRTCOutDir}/modules/audio_mixer/libaudio_mixer_impl.a"
-    "${WebRTCOutDir}/modules/audio_mixer/libaudio_frame_manipulator.a"
-    "${WebRTCOutDir}/modules/desktop_capture/libdesktop_capture.a"
-    "${WebRTCOutDir}/modules/desktop_capture/libprimitives.a"
-    "${WebRTCOutDir}/modules/desktop_capture/libdesktop_capture_differ_sse2.a"
-    "${WebRTCOutDir}/system_wrappers/libsystem_wrappers.a"
-    "${WebRTCOutDir}/system_wrappers/libfield_trial_default.a"
-    "${WebRTCOutDir}/system_wrappers/libmetrics_default.a"
-    "${WebRTCOutDir}/voice_engine/libvoice_engine.a"
-    "${WebRTCOutDir}/voice_engine/libfile_player.a"
-    "${WebRTCOutDir}/voice_engine/libfile_recorder.a"
-    "${WebRTCOutDir}/voice_engine/libaudio_coder.a"
-    "${WebRTCOutDir}/logging/librtc_event_log_impl.a"
-    "${WebRTCOutDir}/stats/librtc_stats.a"
-    "${WebRTCOutDir}/modules/video_capture/libvideo_capture_internal_impl.a"
-    "${WebRTCOutDir}/modules/video_capture/libvideo_capture_module.a"
-    #"${WebRTCOutDir}/modules/video_capture/libvideo_capture.a"
-    ${END_GROUP}
+    "${WebRTCLibDir}/libwebrtc.a"
     Qt5::Core
     Qt5::Quick
+    Qt5::Multimedia
 )
 
 
@@ -203,8 +151,8 @@ if(APPLE)
     )
 else() #LINUX
     target_link_libraries(${PROJECT_NAME}
-        Xcomposite
-        "${WebRTCOutDir}/../../libffmpeg.so"
-        "${WebRTCOutDir}/../base/third_party/libevent/libevent.a"
+        X11
+        yuv
+        #"${WebRTCOutDir}/../base/third_party/libevent/libevent.a"
     )
 endif()    

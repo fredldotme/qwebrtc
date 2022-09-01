@@ -3,6 +3,7 @@
 #include <memory>
 #include <QString>
 #include <QObject>
+#include <QSharedPointer>
 
 namespace QMediaTrackConstraints {
     extern const QString minAspectRatio;
@@ -30,3 +31,7 @@ public:
     /** sets the volume of the audio track must be between [0,10] */
     virtual void setVolume(uint8_t) = 0;
 };
+
+typedef QSharedPointer<QWebRTCMediaTrack> QWebRTCMediaTrackPtr;
+Q_DECLARE_METATYPE(QWebRTCMediaTrackPtr);
+

@@ -89,12 +89,12 @@ void VideoFrameTexture::newVideoFrame(QSharedPointer<webrtc::VideoFrame> frame)
     if (m_buffer.size() != bufferSize) {
         m_buffer.resize(bufferSize);
     }
-    webrtc::ConvertFromI420(*frame, webrtc::kBGRA, 0, m_buffer.data());
+    webrtc::ConvertFromI420(*frame, webrtc::VideoType::kABGR, 0, m_buffer.data());
     glBindTexture(GL_TEXTURE_2D, m_texture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, m_size.width(), m_size.height(), 0, GL_BGRA,
-                 GL_UNSIGNED_INT_8_8_8_8, static_cast<GLvoid*>(m_buffer.data()));
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_size.width(), m_size.height(), 0, GL_RGBA,
+                 GL_UNSIGNED_BYTE, static_cast<GLvoid*>(m_buffer.data()));
 }
 
 void VideoFrameTexture::bind()
