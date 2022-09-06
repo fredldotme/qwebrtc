@@ -16,6 +16,7 @@ option(ENABLE_TSAN "TSAN build" OFF)
 option(ENABLE_UBSAN "UBSAN build" OFF)
 
 set(CMAKE_CXX_FLAGS "-Wall -Werror -Wno-deprecated-declarations -Wno-error=unused-variable -fno-rtti ${CMAKE_CXX_FLAGS}")
+
 if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang" AND "${CMAKE_GENERATOR}" STREQUAL "Ninja")
     set(CMAKE_CXX_FLAGS "-fcolor-diagnostics ${CMAKE_CXX_FLAGS}")
     set(START_GROUP )
@@ -114,12 +115,15 @@ add_library(${PROJECT_NAME} SHARED
 )
 
 target_link_libraries(${PROJECT_NAME}
+    PUBLIC
+
+    -Wl,--whole-archive
     "${WebRTCLibDir}/libwebrtc.a"
+    -Wl,--no-whole-archive
     Qt5::Core
     Qt5::Quick
     Qt5::Multimedia
 )
-
 
 if(APPLE)
     file(GLOB_RECURSE FFMPEG_OBJ
@@ -151,8 +155,13 @@ if(APPLE)
     )
 else() #LINUX
     target_link_libraries(${PROJECT_NAME}
+        PUBLIC
+
+        stdc++
+        hybris-common
+        media
         X11
         yuv
         #"${WebRTCOutDir}/../base/third_party/libevent/libevent.a"
     )
-endif()    
+endif()
