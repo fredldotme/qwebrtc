@@ -9,6 +9,7 @@
 
 #include <webrtc/media/base/adaptedvideotracksource.h>
 #include <webrtc/api/video/i420_buffer.h>
+#include <webrtc/common_video/include/video_frame_buffer.h>
 
 class QWebRTCPeerConnection;
 class QWebRTCPeerConnectionFactory_impl;
@@ -26,7 +27,7 @@ public:
 
     QVideoFilterRunnable* createFilterRunnable() Q_DECL_OVERRIDE;
 
-    void OnFrameCaptured(const rtc::scoped_refptr<webrtc::I420Buffer>& buffer);
+    void OnFrameCaptured(const rtc::scoped_refptr<webrtc::VideoFrameBuffer>& buffer);
 
     virtual int AddRef() const override;
     virtual int Release() const override;

@@ -41,6 +41,21 @@ Q_DECLARE_METATYPE(QSharedPointer<QWebRTCIceCandidate>)
 Q_DECLARE_METATYPE(QSharedPointer<QWebRTCMediaStream>)
 Q_DECLARE_METATYPE(QSharedPointer<QWebRTCDataChannel>)
 
+class TextureBuffer : public webrtc::NativeHandleBuffer {
+public:
+    TextureBuffer(void* texture,
+                  int width,
+                  int height)
+        : webrtc::NativeHandleBuffer(texture, width, height)
+    {}
+
+    ~TextureBuffer() {
+    }
+
+    rtc::scoped_refptr<webrtc::VideoFrameBuffer> NativeToI420Buffer() override {
+        return nullptr;
+    }
+};
 
 WebRTCFrameFetcher::WebRTCFrameFetcher() :
     QAbstractVideoFilter(),
@@ -53,7 +68,7 @@ QVideoFilterRunnable* WebRTCFrameFetcher::createFilterRunnable()
     return new FrameFetchRunnable(this);
 }
 
-void WebRTCFrameFetcher::OnFrameCaptured(const rtc::scoped_refptr<webrtc::I420Buffer>& buffer)
+void WebRTCFrameFetcher::OnFrameCaptured(const rtc::scoped_refptr<webrtc::VideoFrameBuffer>& buffer)
 {
     if (!m_timestamper.isValid())
         m_timestamper.start();
@@ -107,21 +122,30 @@ QVideoFrame FrameFetchRunnable::run(QVideoFrame *input, const QVideoSurfaceForma
         return *input;
     }
 
-    input->map(QAbstractVideoBuffer::ReadOnly);
-    if (input->mappedBytes() <= 0) {
+    static const bool swFallback = true;
+
+    if (swFallback) {
+        input->map(QAbstractVideoBuffer::ReadOnly);
+        if (input->mappedBytes() <= 0) {
+            input->unmap();
+            return *input;
+        }
+
+        rtc::scoped_refptr<webrtc::I420Buffer> buffer = webrtc::I420Buffer::Create(input->width(), input->height());
+        libyuv::ABGRToI420(input->bits(), input->bytesPerLine(),
+                           buffer->MutableDataY(), buffer->StrideY(),
+                           buffer->MutableDataU(), buffer->StrideU(),
+                           buffer->MutableDataV(), buffer->StrideV(),
+                           buffer->width(), buffer->height());
         input->unmap();
-        return *input;
+
+        m_filter->OnFrameCaptured(buffer);
+    } else {
+        unsigned int texture = input->handle().value<unsigned int>();
+        rtc::scoped_refptr<webrtc::VideoFrameBuffer> textureBuffer =
+                new rtc::RefCountedObject<TextureBuffer>((void*)&texture, input->width(), input->height());
+        m_filter->OnFrameCaptured(textureBuffer);
     }
-
-    rtc::scoped_refptr<webrtc::I420Buffer> buffer = webrtc::I420Buffer::Create(input->width(), input->height());
-    libyuv::ABGRToI420(input->bits(), input->bytesPerLine(),
-                       buffer->MutableDataY(), buffer->StrideY(),
-                       buffer->MutableDataU(), buffer->StrideU(),
-                       buffer->MutableDataV(), buffer->StrideV(),
-                       buffer->width(), buffer->height());
-    input->unmap();
-
-    m_filter->OnFrameCaptured(buffer);
 
     return *input;
 }
@@ -182,12 +206,12 @@ QSharedPointer<QWebRTCMediaTrack> QWebRTCPeerConnectionFactory::createScreenCapt
 
 QSharedPointer<QWebRTCMediaStream> QWebRTCPeerConnectionFactory::createMediaStream(const QString& label)
 {
-   return QSharedPointer<QWebRTCMediaStream>(new QWebRTCMediaStream_impl(m_impl->native_interface->CreateLocalMediaStream(label.toStdString())));
+    return QSharedPointer<QWebRTCMediaStream>(new QWebRTCMediaStream_impl(m_impl->native_interface->CreateLocalMediaStream(label.toStdString())));
 }
 
 QSharedPointer<QWebRTCPeerConnection> QWebRTCPeerConnectionFactory::createPeerConnection(const QWebRTCConfiguration& config)
 {
-    rtc::LogMessage::LogToDebug(rtc::LS_WARNING);
+    rtc::LogMessage::LogToDebug(rtc::LS_INFO);
     auto webRTCCOnfig = webrtc::PeerConnectionInterface::RTCConfiguration();
     std::vector<webrtc::PeerConnectionInterface::IceServer> servers;
     for (auto server : config.iceServers) {
@@ -204,6 +228,6 @@ QSharedPointer<QWebRTCPeerConnection> QWebRTCPeerConnectionFactory::createPeerCo
     auto conn = QSharedPointer<QWebRTCPeerConnection>(new QWebRTCPeerConnection());
     conn->m_impl->m_factory = m_impl;
     conn->m_impl->_conn = m_impl->native_interface->CreatePeerConnection(webRTCCOnfig,
-            nullptr, nullptr, conn->m_impl);
+                                                                         nullptr, nullptr, conn->m_impl);
     return conn;
 }
